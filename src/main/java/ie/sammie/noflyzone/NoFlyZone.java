@@ -11,8 +11,10 @@ import net.luckperms.api.model.user.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CompletableFuture;
+
 public class NoFlyZone implements ModInitializer {
-    public static final String MOD_ID = "noflyzone"; // Mod ID should be lowercase
+    public static final String MOD_ID = "noflyzone";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     @Override
@@ -22,17 +24,26 @@ public class NoFlyZone implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayerEntity player = handler.getPlayer();
 
-            // Check if player does NOT have the bypass permission
-            if (!Permissions.check(player, "noflyzone.bypass")) {
-                if (player.getAbilities().allowFlying) {
-                    player.getAbilities().allowFlying = false; // Disable flight
-                    player.getAbilities().flying = false; // Ensure they stop flying
-                    player.sendAbilitiesUpdate(); // Sync changes with client
+            CompletableFuture.supplyAsync(() -> {
+                return Permissions.check(player, "noflyzone.bypass"); // Perform permission check asynchronously
+            }).thenAccept(hasBypassPermission -> {
+                server.submitAndJoin(() -> {
+                    // Check if player does NOT have the bypass permission
+                    if (hasBypassPermission == null || !hasBypassPermission) {
+                        if (player.getAbilities().allowFlying) {
+                            player.getAbilities().allowFlying = false; // Disable flight
+                            player.getAbilities().flying = false; // Ensure they stop flying
+                            player.sendAbilitiesUpdate(); // Sync changes with client
 
-                    // Notify player
-                    player.sendMessage(Text.literal("§cYour flight has been disabled."), false);
-                }
-            }
+                            // Notify player about flight being disabled
+                            player.sendMessage(Text.literal("§cYour flight has been disabled."), false);
+                        }
+                    }
+                });
+            }).exceptionally(ex -> {
+                LOGGER.error("Error checking permissions for player: " + player.getName().getString());
+                return null;
+            });
         });
     }
 }
