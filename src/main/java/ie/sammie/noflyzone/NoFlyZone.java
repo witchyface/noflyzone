@@ -35,7 +35,6 @@ public class NoFlyZone implements ModInitializer {
                             player.getAbilities().flying = false; // Ensure they stop flying
                             player.sendAbilitiesUpdate(); // Sync changes with client
 
-                            // Notify player about flight being disabled
                             player.sendMessage(Text.literal("§cYour flight has been disabled."), false);
                         }
                     }
